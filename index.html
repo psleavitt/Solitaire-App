@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Solitaire</title>
+<style>
+  :root{
+    --felt-deep:#0E4A3B;
+    --felt-shadow:#082F26;
+    --felt-highlight:#155F4A;
+    --brass:#C7A253;
+    --brass-bright:#E7CD86;
+    --brass-dark:#8A6B2E;
+    --ivory:#FAF5E9;
+    --ink:#20201E;
+    --ink-red:#9B2C3A;
+    --cream:#F3EEDD;
+    --cream-dim:#B9C4B9;
+    --danger:#B24A3C;
+
+    --card-w: 12.4vw;
+    --card-h: 17.4vw;
+    --radius-card: 6px;
+    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-data: 'Courier New', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+
+  @media (min-width:560px){
+    :root{ --card-w: 68px; --card-h: 96px; }
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--felt-shadow);
+    font-family: var(--font-ui);
+    color: var(--cream);
+    overscroll-behavior:none;
+    touch-action: manipulation;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  body{
+    background:
+      radial-gradient(120% 90% at 50% -10%, var(--felt-highlight) 0%, var(--felt-deep) 45%, var(--felt-shadow) 100%);
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+  }
+  img,svg{-webkit-user-drag:none;}
+  button{ font-family:inherit; }
+  ::-webkit-scrollbar{ display:none; }
+
+  .felt-quilt{
+    position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 34px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 34px);
+  }
+
+  .screen{
+    display:none;
+    position:relative; z-index:1;
+    flex-direction:column;
+    min-height:100dvh;
+    width:100%;
+    max-width:520px;
+    margin:0 auto;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  }
+  .screen.active{ display:flex; }
+
+  /* ---------- Shared UI bits ---------- */
+  .eyebrow{
+    font-family: var(--font-ui);
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color: var(--brass-bright);
+    opacity:.85;
+  }
+  .rule{
+    height:2px; border:none;
+    background: linear-gradient(90deg, transparent, var(--brass), transparent);
+    margin: 10px 0 18px;
+  }
+  .btn{
+    display:flex; align-items:center; justify-content:center;
+    width:100%;
+    padding:15px 18px;
+    border-radius:10px;
+    border:1px solid rgba(199,162,83,0.5);
+    background: rgba(255,255,255,0.04);
+    color: var(--cream);
+    font-size:16px;
+    font-weight:600;
+    letter-spacing:.01em;
+    cursor:pointer;
+    transition: transform .12s ease, background .12s ease;
+  }
+  .btn:active{ transform: scale(0.98); }
+  .btn:focus-visible{ outline:2px solid var(--brass-bright); outline-offset:2px; }
+  .btn-brass{
+    background: linear-gradient(180deg, var(--brass-bright), var(--brass) 60%, var(--brass-dark));
+    color: #241C08;
+    border-color: var(--brass-dark);
+    font-weight:700;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 6px 14px rgba(0,0,0,0.25);
+  }
+  .btn-ghost{
+    background: transparent;
+    border-color: rgba(243,238,221,0.28);
+    color: var(--cream-dim);
+    font-weight:600;
+  }
+  .btn-danger{
+    background: rgba(178,74,60,0.18);
+    border-color: rgba(178,74,60,0.6);
+    color: #F3D9D3;
+  }
+  .btn-row{ display:flex; gap:10px; }
+  .nav-stack{ display:flex; flex-direction:column; gap:12px; margin-top:8px; }
+  .icon-btn{
+    background:transparent; border:1px solid rgba(243,238,221,0.28);
+    color:var(--cream); border-radius:8px; width:40px; height:40px;
+    font-size:18px; line-height:1; cursor:pointer;
+  }
+  .icon-btn:active{ transform:scale(0.95); }
+
+  .card-panel{
+    background: rgba(0,0,0,0.18);
+    border:1px solid rgba(199,162,83,0.3);
+    border-radius:14px;
+    padding:16px;
+  }
+
+  input[type="text"]{
+    width:100%;
+    padding:13px 14px;
+    border-radius:8px;
+    border:1px solid rgba(199,162,83,0.5);
+    background: rgba(255,255,255,0.06);
+    color: var(--ivory);
+    font-size:16px;
+    font-family: var(--font-ui);
+  }
+  input[type="text"]:focus-visible{ outline:2px solid var(--brass-bright); }
+  label.field-label{
+    display:block; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    color: var(--cream-dim); margin-bottom:6px;
+  }
+
+  /* ---------- Home screen ---------- */
+  #home-screen{ justify-content:flex-start; padding-top:14vh; }
+  .wordmark{
+    font-family: var(--font-display);
+    font-size:44px;
+    text-align:center;
+    letter-spacing:.03em;
+    color: var(--ivory);
+    margin:0;
+  }
+  .wordmark .suits{
+    display:block; text-align:center; font-size:16px; letter-spacing:.5em;
+    color: var(--brass-bright); margin-top:6px;
+  }
+  .greeting{ text-align:center; color:var(--cream-dim); margin: 4px 0 26px; font-size:14px;}
+  .greeting strong{ color:var(--brass-bright); }
+
+  /* ---------- Game screen ---------- */
+  #game-screen{ padding-left:10px; padding-right:10px; }
+  .game-topbar{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .scoreboard{ flex:1; display:flex; gap:8px; }
+  .score-tile{
+    flex:1;
+    background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.2));
+    border:1px solid var(--brass-dark);
+    border-radius:8px;
+    padding:6px 4px 7px;
+    text-align:center;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .tile-label{
+    display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    color: var(--brass); margin-bottom:2px;
+  }
+  .tile-value{
+    display:block; font-family: var(--font-data); font-variant-numeric: tabular-nums;
+    font-size:15px; color: var(--brass-bright); letter-spacing:.05em;
+    text-shadow: 0 0 8px rgba(231,205,134,0.35);
+  }
+
+  .board{ flex:1; display:flex; flex-direction:column; gap:14px; }
+  .top-row{ display:flex; justify-content:space-between; gap:6px; }
+  .stock-waste{ display:flex; gap: calc(var(--card-w) * 0.22); }
+  .foundations{ display:flex; gap: calc(var(--card-w) * 0.16); }
+
+  .pile{
+    width: var(--card-w); height: var(--card-h);
+    border-radius: var(--radius-card);
+    position:relative;
+  }
+  .empty-slot{
+    width:100%; height:100%;
+    border:2px solid rgba(199,162,83,0.35);
+    border-radius: var(--radius-card);
+    display:flex; align-items:center; justify-content:center;
+    color: rgba(199,162,83,0.45);
+    font-size: calc(var(--card-w) * 0.5);
+    background: rgba(0,0,0,0.08);
+  }
+  .empty-slot.recycle{ font-size: calc(var(--card-w) * 0.4); color: var(--brass-bright); cursor:pointer; }
+
+  .waste{ position:relative; }
+  .waste .card-wrap{ position:absolute; top:0; }
+
+  .foundations .pile{ position:relative; }
+
+  .tableau-row{ display:flex; gap: calc(var(--card-w) * 0.10); flex:1; }
+  .tableau-col{ flex:1; position:relative; min-width:0; }
+  .tableau-col .card-wrap{ position:absolute; left:0; top:0; width:100%; }
+
+  .card-wrap{ width: var(--card-w); height: var(--card-h); }
+  .card{
+    width:100%; height:100%;
+    border-radius: var(--radius-card);
+    position:relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+  }
+  .card.face{
+    background: var(--ivory);
+    border:1px solid rgba(0,0,0,0.15);
+  }
+  .card.face.selected{
+    box-shadow: 0 0 0 3px var(--brass-bright), 0 4px 10px rgba(0,0,0,0.4);
+  }
+  .card.back{
+    background:
+      repeating-linear-gradient(45deg, var(--felt-deep) 0 4px, var(--brass-dark) 4px 5px),
+      var(--felt-deep);
+    border:1px solid var(--brass-dark);
+  }
+  .card.back::after{
+    content:"";
+    position:absolute; inset:4px;
+    border:1px solid rgba(199,162,83,0.5);
+    border-radius:3px;
+  }
+  .pip{
+    position:absolute; left:4%; top:3%;
+    font-size: calc(var(--card-w) * 0.22);
+    line-height:1;
+    font-family: var(--font-display);
+    font-weight:700;
+    text-align:center;
+  }
+  .pip .suit{ display:block; font-size:.85em; }
+  .pip.bottom{
+    left:auto; right:4%; top:auto; bottom:3%;
+    transform: rotate(180deg);
+  }
+  .suit-center{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size: calc(var(--card-w) * 0.46);
+    opacity:.9;
+  }
+  .card.red .pip, .card.red .suit-center{ color: var(--ink-red); }
+  .card.black .pip, .card.black .suit-center{ color: var(--ink); }
+
+  @keyframes shakeErr{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-6px); }
+    75%{ transform:translateX(6px); }
+  }
+  .shake{ animation: shakeErr .3s ease; }
+
+  .game-actionbar{ display:flex; gap:8px; margin-top:12px; }
+  .game-actionbar .btn{ padding:13px 10px; font-size:14px; }
+
+  /* ---------- Stats screen ---------- */
+  .screen-header{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .screen-title{ font-family: var(--font-display); font-size:22px; color:var(--ivory); }
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0; }
+  .stat-box{
+    background: rgba(0,0,0,0.2); border:1px solid rgba(199,162,83,0.3);
+    border-radius:10px; padding:14px;
+  }
+  .stat-box .num{ font-family:var(--font-data); font-size:22px; color:var(--brass-bright); }
+  .stat-box .lbl{ font-size:11px; color:var(--cream-dim); text-transform:uppercase; letter-spacing:.08em; margin-top:2px;}
+
+  table.scores{ width:100%; border-collapse:collapse; margin-top:8px; }
+  table.scores th{
+    text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+    color: var(--brass); padding:6px 6px; border-bottom:1px solid rgba(199,162,83,0.35);
+  }
+  table.scores td{
+    padding:9px 6px; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.06);
+    color: var(--cream);
+  }
+  table.scores td.rank{ color: var(--brass-bright); font-weight:700; width:24px; }
+  .empty-msg{ text-align:center; color:var(--cream-dim); padding:28px 10px; font-size:14px; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background: rgba(3,15,11,0.72);
+    display:none; align-items:center; justify-content:center; z-index:20; padding:24px;
+  }
+  .modal-overlay.active{ display:flex; }
+  .modal-box{
+    background: linear-gradient(180deg, #103F32, #0B2F26);
+    border:1px solid var(--brass);
+    border-radius:14px;
+    padding:24px 22px;
+    max-width:360px; width:100%;
+    text-align:center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .modal-box h2{
+    font-family: var(--font-display); color: var(--brass-bright);
+    margin:0 0 8px; font-size:24px;
+  }
+  .modal-box p{ color: var(--cream-dim); font-size:14px; line-height:1.5; margin:0 0 18px; }
+  .modal-stats{ display:flex; justify-content:center; gap:18px; margin-bottom:20px; }
+  .modal-stats div{ text-align:center; }
+  .modal-stats .num{ font-family:var(--font-data); font-size:20px; color:var(--brass-bright); display:block; }
+  .modal-stats .lbl{ font-size:10px; color:var(--cream-dim); text-transform:uppercase; }
+  .modal-box .btn-row{ margin-top:4px; }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background: rgba(20,20,18,0.92); color:var(--brass-bright);
+    border:1px solid var(--brass); border-radius:20px;
+    padding:10px 18px; font-size:13px; z-index:30;
+    opacity:0; pointer-events:none; transition: opacity .25s ease;
+  }
+  .toast.show{ opacity:1; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="felt-quilt"></div>
+
+<!-- HOME SCREEN -->
+<div class="screen active" id="home-screen">
+  <h1 class="wordmark">Solitaire<span class="suits">&#9824; &#9829; &#9830; &#9827;</span></h1>
+  <p class="greeting" id="home-greeting">Welcome!</p>
+  <div class="nav-stack">
+    <button class="btn btn-brass" id="nav-new-game">Start New Game</button>
+    <button class="btn btn-ghost" id="nav-stats">Stats</button>
+    <button class="btn btn-ghost" id="nav-profile">Profile</button>
+    <button class="btn btn-ghost" id="nav-backup">Backup Data</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div class="screen" id="game-screen">
+  <div class="game-topbar">
+    <button class="icon-btn" id="game-back-btn" aria-label="Back to home">&#8592;</button>
+    <div class="scoreboard">
+      <div class="score-tile"><span class="tile-label">Score</span><span class="tile-value" id="score-display">000000</span></div>
+      <div class="score-tile"><span class="tile-label">Time</span><span class="tile-value" id="time-display">00:00</span></div>
+      <div class="score-tile"><span class="tile-label">Moves</span><span class="tile-value" id="moves-display">0</span></div>
+    </div>
+  </div>
+  <div class="board">
+    <div class="top-row">
+      <div class="stock-waste">
+        <div class="pile stock" id="stock-pile" data-zone="stock"></div>
+        <div class="pile waste" id="waste-pile"></div>
+      </div>
+      <div class="foundations" id="foundations-row"></div>
+    </div>
+    <div class="tableau-row" id="tableau-row"></div>
+  </div>
+  <div class="game-actionbar">
+    <button class="btn btn-danger" id="give-up-btn">Give Up</button>
+    <button class="btn btn-ghost" id="auto-btn">Auto</button>
+    <button class="btn btn-brass" id="new-game-btn">New Game</button>
+  </div>
+</div>
+
+<!-- STATS SCREEN -->
+<div class="screen" id="stats-screen">
+  <div class="screen-header">
+    <button class="icon-btn" id="stats-back-btn" aria-label="Back to home">&#8592;</button>
+    <span class="screen-title">Stats</span>
+  </div>
+  <hr class="rule">
+  <div id="stats-body"></div>
+</div>
+
+<!-- PROFILE SCREEN -->
+<div class="screen" id="profile-screen">
+  <div class="screen-header">
+    <button class="icon-btn" id="profile-back-btn" aria-label="Back to home">&#8592;</button>
+    <span class="screen-title">Profile</span>
+  </div>
+  <hr class="rule">
+  <div class="card-panel">
+    <label class="field-label" for="profile-name-input">Player name</label>
+    <input type="text" id="profile-name-input" placeholder="Enter your name" maxlength="24">
+  </div>
+  <div class="nav-stack">
+    <button class="btn btn-brass" id="profile-save-btn">Save</button>
+  </div>
+</div>
+
+<!-- BACKUP SCREEN -->
+<div class="screen" id="backup-screen">
+  <div class="screen-header">
+    <button class="icon-btn" id="backup-back-btn" aria-label="Back to home">&#8592;</button>
+    <span class="screen-title">Backup Data</span>
+  </div>
+  <hr class="rule">
+  <p style="color:var(--cream-dim); font-size:13px; line-height:1.6;">
+    Your profile and game history live only on this device. Export a backup file to keep somewhere safe,
+    or import one to restore your data on a new device or browser.
+  </p>
+  <div class="nav-stack">
+    <button class="btn btn-brass" id="export-btn">Export Backup</button>
+    <button class="btn btn-ghost" id="import-btn">Import Backup</button>
+  </div>
+  <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+</div>
+
+<!-- GIVE UP CONFIRM MODAL -->
+<div class="modal-overlay" id="giveup-modal">
+  <div class="modal-box">
+    <h2>Give up?</h2>
+    <p>This ends the current game and records it as a loss. Your score won't be saved to your high scores.</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="giveup-cancel-btn">Keep Playing</button>
+      <button class="btn btn-danger" id="giveup-confirm-btn">Give Up</button>
+    </div>
+  </div>
+</div>
+
+<!-- END OF GAME MODAL (win or loss) -->
+<div class="modal-overlay" id="end-modal">
+  <div class="modal-box">
+    <h2 id="end-modal-title">You Win!</h2>
+    <p id="end-modal-sub"></p>
+    <div class="modal-stats" id="end-modal-stats"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="end-home-btn">Home</button>
+      <button class="btn btn-brass" id="end-newgame-btn">New Game</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ===================== Storage layer ===================== */
+  var STORAGE_KEY = "solitaireAppData_v1";
+
+  function defaultData(){
+    return { profile: { name: "" }, games: [] };
+  }
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultData();
+      var parsed = JSON.parse(raw);
+      return {
+        profile: (parsed && parsed.profile && typeof parsed.profile.name === "string") ? parsed.profile : { name: "" },
+        games: (parsed && Array.isArray(parsed.games)) ? parsed.games : []
+      };
+    }catch(e){
+      return defaultData();
+    }
+  }
+  function saveData(data){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+  function recordGame(entry){
+    var data = loadData();
+    data.games.push(entry);
+    saveData(data);
+  }
+
+  /* ===================== Utilities ===================== */
+  function pad(n, len){ n = String(n); while(n.length < len) n = "0" + n; return n; }
+  function formatTime(sec){
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec/3600);
+    var m = Math.floor((sec%3600)/60);
+    var s = sec%60;
+    if(h > 0) return h + ":" + pad(m,2) + ":" + pad(s,2);
+    return pad(m,2) + ":" + pad(s,2);
+  }
+  function formatDate(iso){
+    try{
+      var d = new Date(iso);
+      return d.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
+    }catch(e){ return ""; }
+  }
+  function rankLabel(rank){
+    if(rank === 1) return "A";
+    if(rank === 11) return "J";
+    if(rank === 12) return "Q";
+    if(rank === 13) return "K";
+    return String(rank);
+  }
+  var SUIT_SYMBOL = { S: "\u2660", H: "\u2665", D: "\u2666", C: "\u2663" };
+  function suitColor(suit){ return (suit === "H" || suit === "D") ? "red" : "black"; }
+
+  function showToast(msg){
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(function(){ t.classList.remove("show"); }, 1800);
+  }
+
+  /* ===================== Screen navigation ===================== */
+  function showScreen(id){
+    var screens = document.querySelectorAll(".screen");
+    for(var i=0;i<screens.length;i++) screens[i].classList.remove("active");
+    document.getElementById(id).classList.add("active");
+  }
+
+  function goHome(){
+    updateGreeting();
+    showScreen("home-screen");
+  }
+
+  function updateGreeting(){
+    var data = loadData();
+    var name = (data.profile && data.profile.name) ? data.profile.name.trim() : "";
+    var el = document.getElementById("home-greeting");
+    if(name){
+      el.innerHTML = "Welcome back, <strong>" + escapeHtml(name) + "</strong>";
+    } else {
+      el.innerHTML = "Welcome! Set up your <strong>Profile</strong> to track your name.";
+    }
+  }
+  function escapeHtml(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  /* ===================== Game engine ===================== */
+  var game = null; // active game state
+
+  function buildDeck(){
+    var suits = ["S","H","D","C"];
+    var deck = [];
+    for(var s=0;s<suits.length;s++){
+      for(var r=1;r<=13;r++){
+        deck.push({ suit: suits[s], rank: r });
+      }
+    }
+    // Fisher-Yates shuffle
+    for(var i=deck.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var tmp = deck[i]; deck[i] = deck[j]; deck[j] = tmp;
+    }
+    return deck;
+  }
+
+  function startNewGame(){
+    var deck = buildDeck();
+    var tableau = [];
+    for(var i=0;i<7;i++){
+      var pile = [];
+      for(var j=0;j<=i;j++){
+        var card = deck.pop();
+        pile.push({ card: card, faceUp: (j === i) });
+      }
+      tableau.push(pile);
+    }
+    game = {
+      stock: deck, // deck[deck.length-1] is the top of stock
+      waste: [],
+      foundations: { S: [], H: [], D: [], C: [] },
+      tableau: tableau,
+      selection: null,
+      score: 0,
+      moves: 0,
+      startTime: Date.now(),
+      elapsedSeconds: 0,
+      timerId: null,
+      gameOver: false
+    };
+    startTimer();
+    renderAll();
+    showScreen("game-screen");
+  }
+
+  function startTimer(){
+    stopTimer();
+    game.timerId = setInterval(function(){
+      if(!game || game.gameOver) return;
+      game.elapsedSeconds = Math.floor((Date.now() - game.startTime)/1000);
+      var timeEl = document.getElementById("time-display");
+      if(timeEl) timeEl.textContent = formatTime(game.elapsedSeconds);
+    }, 1000);
+  }
+  function stopTimer(){
+    if(game && game.timerId){ clearInterval(game.timerId); game.timerId = null; }
+  }
+
+  function addScore(delta){
+    game.score = Math.max(0, game.score + delta);
+  }
+
+  /* ---- Move validation ---- */
+  function canPlaceOnTableau(card, destTopWrap){
+    if(!destTopWrap) return card.rank === 13; // empty column only accepts a King
+    var top = destTopWrap.card;
+    return suitColor(top.suit) !== suitColor(card.suit) && top.rank === card.rank + 1;
+  }
+  function canPlaceOnFoundation(card, suit, foundationPile){
+    if(card.suit !== suit) return false;
+    if(foundationPile.length === 0) return card.rank === 1;
+    var top = foundationPile[foundationPile.length-1];
+    return top.rank === card.rank - 1;
+  }
+
+  /* ---- Selection helpers ---- */
+  function selectionsEqual(a, b){
+    if(!a || !b) return false;
+    if(a.zone !== b.zone) return false;
+    if(a.zone === "tableau") return a.pileIndex === b.pileIndex && a.cardIndex === b.cardIndex;
+    if(a.zone === "foundation") return a.suit === b.suit;
+    if(a.zone === "waste") return true;
+    return false;
+  }
+
+  function trySelect(zone, pileIndex, suit, cardIndex){
+    if(zone === "waste"){
+      if(game.waste.length === 0) return null;
+      return { zone: "waste" };
+    }
+    if(zone === "foundation"){
+      if(!suit || game.foundations[suit].length === 0) return null;
+      return { zone: "foundation", suit: suit };
+    }
+    if(zone === "tableau"){
+      var pile = game.tableau[pileIndex];
+      if(!pile || cardIndex === undefined || cardIndex === null) return null;
+      var wrap = pile[cardIndex];
+      if(!wrap || !wrap.faceUp) return null;
+      return { zone: "tableau", pileIndex: pileIndex, cardIndex: cardIndex };
+    }
+    return null;
+  }
+
+  function getSelectionRun(sel){
+    if(sel.zone === "waste"){
+      var w = game.waste;
+      return w.length ? [w[w.length-1]] : [];
+    }
+    if(sel.zone === "foundation"){
+      var f = game.foundations[sel.suit];
+      return f.length ? [f[f.length-1]] : [];
+    }
+    if(sel.zone === "tableau"){
+      var pile = game.tableau[sel.pileIndex];
+      return pile.slice(sel.cardIndex).map(function(w){ return w.card; });
+    }
+    return [];
+  }
+
+  function clearSelection(){ game.selection = null; }
+
+  /* ---- Move execution ---- */
+  function tryMoveToTableau(sel, destPileIndex){
+    var run = getSelectionRun(sel);
+    if(!run.length) return false;
+    var leadCard = run[0];
+    var destPile = game.tableau[destPileIndex];
+    var destTopWrap = destPile.length ? destPile[destPile.length-1] : null;
+
+    if(sel.zone === "tableau" && sel.pileIndex === destPileIndex) return false;
+    if(!canPlaceOnTableau(leadCard, destTopWrap)) return false;
+
+    // remove from source
+    if(sel.zone === "waste"){
+      game.waste.pop();
+      addScore(5);
+    } else if(sel.zone === "foundation"){
+      game.foundations[sel.suit].pop();
+      addScore(-15);
+    } else if(sel.zone === "tableau"){
+      var srcPile = game.tableau[sel.pileIndex];
+      srcPile.splice(sel.cardIndex);
+      revealNewTopIfNeeded(srcPile);
+    }
+
+    // add to destination
+    for(var i=0;i<run.length;i++){
+      destPile.push({ card: run[i], faceUp: true });
+    }
+    game.moves++;
+    return true;
+  }
+
+  function tryMoveToFoundation(sel, destSuit){
+    var run = getSelectionRun(sel);
+    if(run.length !== 1) return false;
+    var card = run[0];
+    if(card.suit !== destSuit) return false;
+    var foundationPile = game.foundations[destSuit];
+    if(!canPlaceOnFoundation(card, destSuit, foundationPile)) return false;
+
+    if(sel.zone === "waste"){
+      game.waste.pop();
+      addScore(10);
+    } else if(sel.zone === "tableau"){
+      var srcPile = game.tableau[sel.pileIndex];
+      srcPile.splice(sel.cardIndex);
+      revealNewTopIfNeeded(srcPile);
+      addScore(10);
+    } else if(sel.zone === "foundation"){
+      return false; // moving foundation to foundation makes no sense
+    }
+    foundationPile.push(card);
+    game.moves++;
+    return true;
+  }
+
+  function revealNewTopIfNeeded(pile){
+    if(pile.length === 0) return;
+    var top = pile[pile.length-1];
+    if(!top.faceUp){
+      top.faceUp = true;
+      addScore(5);
+    }
+  }
+
+  function doStockAction(){
+    if(game.gameOver) return;
+    clearSelection();
+    if(game.stock.length === 0){
+      if(game.waste.length === 0){ renderAll(); return; }
+      game.stock = game.waste.slice().reverse();
+      game.waste = [];
+    } else {
+      var n = Math.min(3, game.stock.length);
+      var drawn = game.stock.splice(game.stock.length - n, n);
+      for(var i=0;i<drawn.length;i++) game.waste.push(drawn[i]);
+    }
+    game.moves++;
+    renderAll();
+  }
+
+  /* ---- Foundation auto-move (double tap) ---- */
+  function autoSuitOf(card){ return card.suit; }
+  function tryAutoFoundation(zone, pileIndex, cardIndex){
+    var sel = null;
+    if(zone === "waste"){
+      if(game.waste.length === 0) return;
+      sel = { zone: "waste" };
+    } else if(zone === "tableau"){
+      var pile = game.tableau[pileIndex];
+      if(!pile || cardIndex !== pile.length - 1) return; // only the exposed top card
+      sel = { zone: "tableau", pileIndex: pileIndex, cardIndex: cardIndex };
+    } else {
+      return;
+    }
+    var run = getSelectionRun(sel);
+    if(run.length !== 1) return;
+    var card = run[0];
+    var moved = tryMoveToFoundation(sel, autoSuitOf(card));
+    if(moved){
+      clearSelection();
+      renderAll();
+      checkWin();
+    }
+  }
+
+  function autoPlayPass(){
+    // Repeatedly send any eligible waste/tableau top cards to foundations.
+    var movedAny = false;
+    var guard = 0;
+    var progress = true;
+    while(progress && guard < 300){
+      progress = false;
+      guard++;
+      if(game.waste.length){
+        var wc = game.waste[game.waste.length-1];
+        if(tryMoveToFoundation({ zone:"waste" }, wc.suit)){ progress = true; movedAny = true; continue; }
+      }
+      for(var p=0;p<7;p++){
+        var pile = game.tableau[p];
+        if(pile.length){
+          var topIdx = pile.length-1;
+          var topWrap = pile[topIdx];
+          if(topWrap.faceUp){
+            if(tryMoveToFoundation({ zone:"tableau", pileIndex:p, cardIndex:topIdx }, topWrap.card.suit)){
+              progress = true; movedAny = true; break;
+            }
+          }
+        }
+      }
+    }
+    clearSelection();
+    renderAll();
+    if(movedAny) checkWin();
+    if(!movedAny) showToast("No automatic moves available");
+  }
+
+  /* ---- Win / lose ---- */
+  function checkWin(){
+    var total = game.foundations.S.length + game.foundations.H.length + game.foundations.D.length + game.foundations.C.length;
+    if(total === 52){
+      handleWin();
+    }
+  }
+
+  // Stops the clock, marks the game over, and records the result to storage.
+  // Returns { finalScore, bonus } so the caller can decide whether/how to show a modal.
+  function endGame(result){
+    stopTimer();
+    game.gameOver = true;
+    var bonus = 0;
+    var finalScore = game.score;
+    if(result === "win"){
+      bonus = game.elapsedSeconds < 30 ? 0 : Math.floor(700000 / game.elapsedSeconds);
+      finalScore = game.score + bonus;
+    }
+    recordGame({
+      result: result,
+      score: finalScore,
+      moves: game.moves,
+      timeSeconds: game.elapsedSeconds,
+      date: new Date().toISOString()
+    });
+    return { finalScore: finalScore, bonus: bonus };
+  }
+
+  function handleWin(){
+    var outcome = endGame("win");
+    document.getElementById("end-modal-title").textContent = "You Win!";
+    document.getElementById("end-modal-sub").textContent = outcome.bonus > 0
+      ? ("Time bonus: +" + outcome.bonus + " points for finishing quickly.")
+      : "Cleared the table.";
+    document.getElementById("end-modal-stats").innerHTML =
+      statBlock(outcome.finalScore, "Score") + statBlock(formatTime(game.elapsedSeconds), "Time") + statBlock(game.moves, "Moves");
+    openModal("end-modal");
+  }
+
+  function handleGiveUp(){
+    var outcome = endGame("loss");
+    document.getElementById("end-modal-title").textContent = "Game Over";
+    document.getElementById("end-modal-sub").textContent = "Recorded as a loss.";
+    document.getElementById("end-modal-stats").innerHTML =
+      statBlock(outcome.finalScore, "Score") + statBlock(formatTime(game.elapsedSeconds), "Time") + statBlock(game.moves, "Moves");
+    openModal("end-modal");
+  }
+
+  function statBlock(val, label){
+    return '<div><span class="num">' + val + '</span><span class="lbl">' + label + '</span></div>';
+  }
+
+  /* ===================== Rendering ===================== */
+  function cardFaceHtml(card){
+    var symbol = SUIT_SYMBOL[card.suit];
+    var label = rankLabel(card.rank);
+    return (
+      '<div class="pip top">' + label + '<span class="suit">' + symbol + '</span></div>' +
+      '<div class="suit-center">' + symbol + '</div>' +
+      '<div class="pip bottom">' + label + '<span class="suit">' + symbol + '</span></div>'
+    );
+  }
+
+  function overlapForPile(len){
+    var base = 26; // px baseline overlap
+    if(len <= 1) return base;
+    var maxTotalPx = 320; // budget beyond first card
+    var needed = base * (len - 1);
+    if(needed <= maxTotalPx) return base;
+    return maxTotalPx / (len - 1);
+  }
+
+  function renderAll(){
+    if(!game) return;
+    document.getElementById("score-display").textContent = pad(game.score, 6);
+    document.getElementById("time-display").textContent = formatTime(game.elapsedSeconds);
+    document.getElementById("moves-display").textContent = String(game.moves);
+
+    renderStock();
+    renderWaste();
+    renderFoundations();
+    renderTableau();
+  }
+
+  function renderStock(){
+    var el = document.getElementById("stock-pile");
+    el.innerHTML = "";
+    if(game.stock.length > 0){
+      var back = document.createElement("div");
+      back.className = "card back";
+      el.appendChild(back);
+    } else if(game.waste.length > 0){
+      var recycle = document.createElement("div");
+      recycle.className = "empty-slot recycle";
+      recycle.textContent = "\u21BA";
+      el.appendChild(recycle);
+    } else {
+      var empty = document.createElement("div");
+      empty.className = "empty-slot";
+      el.appendChild(empty);
+    }
+  }
+
+  function renderWaste(){
+    var el = document.getElementById("waste-pile");
+    el.innerHTML = "";
+    var w = game.waste;
+    if(w.length === 0){
+      var empty = document.createElement("div");
+      empty.className = "empty-slot";
+      el.appendChild(empty);
+      return;
+    }
+    var showCount = Math.min(3, w.length);
+    var startIdx = w.length - showCount;
+    for(var i=0;i<showCount;i++){
+      var idx = startIdx + i;
+      var card = w[idx].card !== undefined ? w[idx].card : w[idx];
+      var isTop = (i === showCount - 1);
+      var wrap = document.createElement("div");
+      wrap.className = "card-wrap";
+      wrap.style.left = (i * 16) + "px";
+      wrap.style.zIndex = String(i);
+      var cardEl = document.createElement("div");
+      cardEl.className = "card face " + suitColor(card.suit);
+      cardEl.innerHTML = cardFaceHtml(card);
+      if(isTop){
+        cardEl.setAttribute("data-zone", "waste");
+        if(game.selection && game.selection.zone === "waste") cardEl.classList.add("selected");
+      }
+      wrap.appendChild(cardEl);
+      el.appendChild(wrap);
+    }
+  }
+
+  function renderFoundations(){
+    var el = document.getElementById("foundations-row");
+    el.innerHTML = "";
+    var order = ["S","H","D","C"];
+    for(var i=0;i<order.length;i++){
+      var suit = order[i];
+      var pile = game.foundations[suit];
+      var slot = document.createElement("div");
+      slot.className = "pile";
+      slot.setAttribute("data-zone", "foundation");
+      slot.setAttribute("data-suit", suit);
+      if(pile.length === 0){
+        var empty = document.createElement("div");
+        empty.className = "empty-slot";
+        empty.innerHTML = SUIT_SYMBOL[suit];
+        empty.style.color = suitColor(suit) === "red" ? "rgba(155,44,58,0.45)" : "rgba(32,32,30,0.35)";
+        empty.setAttribute("data-zone", "foundation");
+        empty.setAttribute("data-suit", suit);
+        slot.appendChild(empty);
+      } else {
+        var top = pile[pile.length-1];
+        var cardEl = document.createElement("div");
+        cardEl.className = "card face " + suitColor(top.suit);
+        cardEl.innerHTML = cardFaceHtml(top);
+        cardEl.setAttribute("data-zone", "foundation");
+        cardEl.setAttribute("data-suit", suit);
+        if(game.selection && game.selection.zone === "foundation" && game.selection.suit === suit) cardEl.classList.add("selected");
+        slot.appendChild(cardEl);
+      }
+      el.appendChild(slot);
+    }
+  }
+
+  function renderTableau(){
+    var el = document.getElementById("tableau-row");
+    el.innerHTML = "";
+    for(var p=0;p<7;p++){
+      var pile = game.tableau[p];
+      var col = document.createElement("div");
+      col.className = "tableau-col";
+      col.setAttribute("data-zone", "tableau");
+      col.setAttribute("data-pile", String(p));
+
+      var overlap = overlapForPile(pile.length);
+      var colHeightPx = null;
+
+      if(pile.length === 0){
+        var empty = document.createElement("div");
+        empty.className = "empty-slot";
+        empty.setAttribute("data-zone", "tableau");
+        empty.setAttribute("data-pile", String(p));
+        col.appendChild(empty);
+      } else {
+        for(var i=0;i<pile.length;i++){
+          var wrapData = pile[i];
+          var wrap = document.createElement("div");
+          wrap.className = "card-wrap";
+          wrap.style.top = (i * overlap) + "px";
+          wrap.style.zIndex = String(i);
+          var cardEl = document.createElement("div");
+          if(wrapData.faceUp){
+            cardEl.className = "card face " + suitColor(wrapData.card.suit);
+            cardEl.innerHTML = cardFaceHtml(wrapData.card);
+            cardEl.setAttribute("data-zone", "tableau");
+            cardEl.setAttribute("data-pile", String(p));
+            cardEl.setAttribute("data-cardindex", String(i));
+            if(game.selection && game.selection.zone === "tableau" && game.selection.pileIndex === p && i >= game.selection.cardIndex){
+              cardEl.classList.add("selected");
+            }
+          } else {
+            cardEl.className = "card back";
+          }
+          wrap.appendChild(cardEl);
+          col.appendChild(wrap);
+        }
+        colHeightPx = (pile.length - 1) * overlap + parseFloat(getComputedCardHeight());
+        col.style.minHeight = colHeightPx + "px";
+      }
+      el.appendChild(col);
+    }
+  }
+
+  var _cachedCardHeight = null;
+  function getComputedCardHeight(){
+    if(_cachedCardHeight) return _cachedCardHeight;
+    var probe = document.querySelector(".card-wrap");
+    if(probe){
+      _cachedCardHeight = probe.getBoundingClientRect().height + "px";
+    } else {
+      _cachedCardHeight = "96px";
+    }
+    return _cachedCardHeight;
+  }
+
+  /* ===================== Input handling ===================== */
+  function handleTap(zone, pileIndex, suit, cardIndex){
+    if(!game || game.gameOver) return;
+
+    if(zone === "stock"){ doStockAction(); return; }
+
+    if(game.selection){
+      var moved = false;
+      if(zone === "tableau"){ moved = tryMoveToTableau(game.selection, pileIndex); }
+      else if(zone === "foundation"){ moved = tryMoveToFoundation(game.selection, suit); }
+
+      if(moved){
+        clearSelection();
+        renderAll();
+        checkWin();
+        return;
+      }
+
+      // tapping the same source again: deselect
+      var thisTarget = { zone: zone, pileIndex: pileIndex, suit: suit, cardIndex: cardIndex };
+      if(zone === game.selection.zone &&
+         ((zone === "tableau" && pileIndex === game.selection.pileIndex) ||
+          (zone === "foundation" && suit === game.selection.suit) ||
+          (zone === "waste"))){
+        clearSelection();
+        renderAll();
+        return;
+      }
+
+      // try selecting a new source instead
+      var newSel = trySelect(zone, pileIndex, suit, cardIndex);
+      if(newSel){
+        game.selection = newSel;
+        renderAll();
+        return;
+      }
+
+      flashInvalid(zone, pileIndex, suit);
+      clearSelection();
+      renderAll();
+      return;
+    }
+
+    var sel = trySelect(zone, pileIndex, suit, cardIndex);
+    if(sel){
+      game.selection = sel;
+      renderAll();
+    }
+  }
+
+  function flashInvalid(zone, pileIndex, suit){
+    var selector = null;
+    if(zone === "tableau") selector = '.tableau-col[data-pile="' + pileIndex + '"]';
+    else if(zone === "foundation") selector = '.pile[data-suit="' + suit + '"]';
+    if(!selector) return;
+    var elx = document.querySelector(selector);
+    if(elx){
+      elx.classList.add("shake");
+      setTimeout(function(){ elx.classList.remove("shake"); }, 320);
+    }
+  }
+
+  function attachBoardEvents(){
+    var board = document.querySelector(".board");
+    board.addEventListener("click", function(e){
+      var target = e.target.closest("[data-zone]");
+      if(!target) return;
+      var zone = target.getAttribute("data-zone");
+      var pileIndex = target.hasAttribute("data-pile") ? parseInt(target.getAttribute("data-pile"), 10) : null;
+      var suit = target.getAttribute("data-suit");
+      var cardIndex = target.hasAttribute("data-cardindex") ? parseInt(target.getAttribute("data-cardindex"), 10) : null;
+      handleTap(zone, pileIndex, suit, cardIndex);
+    });
+
+    board.addEventListener("dblclick", function(e){
+      var target = e.target.closest('.card[data-zone="waste"], .card[data-zone="tableau"]');
+      if(!target) return;
+      var zone = target.getAttribute("data-zone");
+      var pileIndex = target.hasAttribute("data-pile") ? parseInt(target.getAttribute("data-pile"), 10) : null;
+      var cardIndex = target.hasAttribute("data-cardindex") ? parseInt(target.getAttribute("data-cardindex"), 10) : null;
+      tryAutoFoundation(zone, pileIndex, cardIndex);
+    });
+
+    board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  }
+
+  /* ===================== Modal helpers ===================== */
+  function openModal(id){ document.getElementById(id).classList.add("active"); }
+  function closeModal(id){ document.getElementById(id).classList.remove("active"); }
+
+  /* ===================== Stats screen ===================== */
+  function computeStats(games){
+    var played = games.length;
+    var wins = 0;
+    for(var i=0;i<games.length;i++) if(games[i].result === "win") wins++;
+    var losses = played - wins;
+    var winPct = played ? Math.round((wins/played)*1000)/10 : 0;
+    var highScores = games.filter(function(g){ return g.result === "win"; })
+                           .sort(function(a,b){ return b.score - a.score; })
+                           .slice(0,10);
+    return { played: played, wins: wins, losses: losses, winPct: winPct, highScores: highScores };
+  }
+
+  function renderStats(){
+    var data = loadData();
+    var stats = computeStats(data.games);
+    var body = document.getElementById("stats-body");
+
+    var html = "";
+    html += '<div class="stat-grid">';
+    html += '<div class="stat-box"><div class="num">' + stats.winPct + '%</div><div class="lbl">Win Rate</div></div>';
+    html += '<div class="stat-box"><div class="num">' + stats.wins + ' / ' + stats.played + '</div><div class="lbl">Wins / Played</div></div>';
+    html += '</div>';
+
+    html += '<div class="eyebrow">Top 10 High Scores</div><hr class="rule">';
+    if(stats.highScores.length === 0){
+      html += '<div class="empty-msg">No wins recorded yet. Play a game to set your first high score.</div>';
+    } else {
+      html += '<table class="scores"><thead><tr><th>#</th><th>Score</th><th>Time</th><th>Moves</th><th>Date</th></tr></thead><tbody>';
+      for(var i=0;i<stats.highScores.length;i++){
+        var g = stats.highScores[i];
+        html += '<tr><td class="rank">' + (i+1) + '</td><td>' + g.score + '</td><td>' + formatTime(g.timeSeconds) + '</td><td>' + g.moves + '</td><td>' + formatDate(g.date) + '</td></tr>';
+      }
+      html += '</tbody></table>';
+    }
+    body.innerHTML = html;
+  }
+
+  /* ===================== Profile screen ===================== */
+  function renderProfileScreen(){
+    var data = loadData();
+    document.getElementById("profile-name-input").value = (data.profile && data.profile.name) ? data.profile.name : "";
+  }
+  function saveProfile(){
+    var data = loadData();
+    var val = document.getElementById("profile-name-input").value.trim();
+    data.profile.name = val;
+    saveData(data);
+    showToast("Profile saved");
+    goHome();
+  }
+
+  /* ===================== Backup / export / import ===================== */
+  function exportBackup(){
+    var data = loadData();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var d = new Date();
+    var stamp = d.getFullYear() + pad(d.getMonth()+1,2) + pad(d.getDate(),2);
+    a.href = url;
+    a.download = "solitaire-backup-" + stamp + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    showToast("Backup exported");
+  }
+
+  function importBackup(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var parsed = JSON.parse(reader.result);
+        if(!parsed || typeof parsed !== "object") throw new Error("bad format");
+        var ok = window.confirm("This will replace your current profile and game history with the imported backup. Continue?");
+        if(!ok) return;
+        var clean = {
+          profile: (parsed.profile && typeof parsed.profile.name === "string") ? parsed.profile : { name: "" },
+          games: Array.isArray(parsed.games) ? parsed.games : []
+        };
+        saveData(clean);
+        showToast("Backup imported");
+        updateGreeting();
+      }catch(err){
+        window.alert("That file could not be read. Please choose a valid Solitaire backup file.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /* ===================== Wire up UI ===================== */
+  function init(){
+    updateGreeting();
+    attachBoardEvents();
+
+    document.getElementById("nav-new-game").addEventListener("click", startNewGame);
+    document.getElementById("nav-stats").addEventListener("click", function(){ renderStats(); showScreen("stats-screen"); });
+    document.getElementById("nav-profile").addEventListener("click", function(){ renderProfileScreen(); showScreen("profile-screen"); });
+    document.getElementById("nav-backup").addEventListener("click", function(){ showScreen("backup-screen"); });
+
+    document.getElementById("stats-back-btn").addEventListener("click", goHome);
+    document.getElementById("profile-back-btn").addEventListener("click", goHome);
+    document.getElementById("backup-back-btn").addEventListener("click", goHome);
+
+    document.getElementById("profile-save-btn").addEventListener("click", saveProfile);
+
+    document.getElementById("export-btn").addEventListener("click", exportBackup);
+    document.getElementById("import-btn").addEventListener("click", function(){
+      document.getElementById("import-file-input").click();
+    });
+    document.getElementById("import-file-input").addEventListener("change", function(e){
+      var file = e.target.files[0];
+      if(file) importBackup(file);
+      e.target.value = "";
+    });
+
+    document.getElementById("game-back-btn").addEventListener("click", function(){
+      if(game && !game.gameOver){
+        openModal("giveup-modal");
+      } else {
+        goHome();
+      }
+    });
+
+    document.getElementById("new-game-btn").addEventListener("click", function(){
+      if(game && !game.gameOver){
+        if(window.confirm("Starting a new game will end this one and count as a loss. Continue?")){
+          endGame("loss");
+          startNewGame();
+        }
+      } else {
+        startNewGame();
+      }
+    });
+
+    document.getElementById("give-up-btn").addEventListener("click", function(){
+      if(!game || game.gameOver) return;
+      openModal("giveup-modal");
+    });
+    document.getElementById("giveup-cancel-btn").addEventListener("click", function(){ closeModal("giveup-modal"); });
+    document.getElementById("giveup-confirm-btn").addEventListener("click", function(){
+      closeModal("giveup-modal");
+      handleGiveUp();
+    });
+
+    document.getElementById("auto-btn").addEventListener("click", function(){
+      if(!game || game.gameOver) return;
+      autoPlayPass();
+    });
+
+    document.getElementById("end-home-btn").addEventListener("click", function(){
+      closeModal("end-modal");
+      goHome();
+    });
+    document.getElementById("end-newgame-btn").addEventListener("click", function(){
+      closeModal("end-modal");
+      startNewGame();
+    });
+
+    goHome();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
