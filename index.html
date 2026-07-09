@@ -779,20 +779,27 @@
     clearSelection();
     if(game.stock.length === 0){
       if(wasteIsEmpty()){ renderAll(); return; }
-      // Rebuild the stock by reversing the ORDER of draw-batches while
-      // keeping each batch's own card order intact. This reproduces the
-      // exact original draw sequence on redeal (assuming no cards were
-      // played in between), rather than scrambling it with a flat reverse.
-      var rebuilt = [];
-      for(var b = game.waste.length - 1; b >= 0; b--){
+      // Rebuild the stock: flatten every batch in the order it was drawn,
+      // then reverse that whole flat sequence. Combined with the
+      // deal-one-at-a-time order used below when drawing, this restores
+      // the exact original card order, so redealing with no moves made
+      // reproduces the identical sequence of batches every time.
+      var flat = [];
+      for(var b = 0; b < game.waste.length; b++){
         var batch = game.waste[b];
-        for(var k=0;k<batch.length;k++) rebuilt.push(batch[k]);
+        for(var k=0;k<batch.length;k++) flat.push(batch[k]);
       }
-      game.stock = rebuilt;
+      flat.reverse();
+      game.stock = flat;
       game.waste = [];
     } else {
       var n = Math.min(3, game.stock.length);
       var drawn = game.stock.splice(game.stock.length - n, n);
+      // Cards are dealt one at a time from the top of the stock, each new
+      // card landing on top of the ones just dealt. That means the literal
+      // top card of the stock is dealt first and ends up buried, while the
+      // deepest card of this draw is dealt last and ends up on top/playable.
+      drawn.reverse();
       game.waste.push(drawn);
     }
     game.moves++;
